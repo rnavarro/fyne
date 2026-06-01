@@ -50,9 +50,18 @@ func runOnMainWithWait(f func(), wait bool) {
 		defer common.DonePool.Put(done)
 
 		funcQueue.In() <- funcData{f: f, done: done}
+		// Wake the main loop so it drains this immediately rather than waiting
+		// up to the WaitEventsTimeout interval (guarded: before Run the loop
+		// isn't parked, and PostEmptyEvent before glfw.Init would error).
+		if running.Load() {
+			wakeEventLoop()
+		}
 		<-done
 	} else {
 		funcQueue.In() <- funcData{f: f}
+		if running.Load() {
+			wakeEventLoop()
+		}
 	}
 }
 

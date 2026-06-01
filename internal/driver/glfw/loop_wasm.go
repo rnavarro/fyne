@@ -21,6 +21,11 @@ func (d *gLDriver) pollEvents() {
 	glfw.PollEvents() // This call blocks while window is being resized, which prevents freeDirtyTextures from being called
 }
 
+// wakeEventLoop is a no-op on wasm: the browser event loop is not blocked on a
+// WaitEventsTimeout call, so there is nothing to wake. Present so shared code
+// (driver.Quit, runOnMainWithWait) compiles on all platforms.
+func wakeEventLoop() {}
+
 func (d *gLDriver) Terminate() {
 	glfw.Terminate()
 }

@@ -37,7 +37,14 @@ func (d *gLDriver) initGLFW() {
 }
 
 func (d *gLDriver) pollEvents() {
-	glfw.PollEvents() // This call blocks while window is being resized, which prevents freeDirtyTextures from being called
+	glfw.WaitEventsTimeout(0.1) // Idle-friendly: block up to 100ms instead of busy-polling at 60fps
+}
+
+// wakeEventLoop unblocks WaitEventsTimeout so the main loop promptly drains the
+// funcQueue (fyne.Do work) or observes d.done. Safe to call from any goroutine:
+// glfw.PostEmptyEvent is documented thread-safe.
+func wakeEventLoop() {
+	glfw.PostEmptyEvent()
 }
 
 func (d *gLDriver) Terminate() {
