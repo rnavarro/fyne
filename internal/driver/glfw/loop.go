@@ -75,6 +75,18 @@ func decideRepaint(visible, ready bool, checkDirtyAndClear func() bool) bool {
 	return visible && ready && checkDirtyAndClear()
 }
 
+// visibleCanvasDirty reports whether a visible window has a repaint pending.
+// pollEvents must not park then, because drawSingleFrame runs after it.
+func (d *gLDriver) visibleCanvasDirty() bool {
+	for _, win := range d.windowList() {
+		w := win.(*window)
+		if !w.closing && w.visible && w.canvas.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *gLDriver) drawSingleFrame() {
 	refreshed := false
 	for _, win := range d.windowList() {

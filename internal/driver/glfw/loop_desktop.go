@@ -57,8 +57,13 @@ func (d *gLDriver) initGLFW() {
 // consumed, so waiting here delayed queued work by 100-700ms. A function
 // queued after the check increments pendingFuncs before posting its wake, so
 // the wake is never lost.
+//
+// It does not block while a visible canvas is dirty either: drawSingleFrame
+// runs after pollEvents in the same tick, so parking delayed a repaint by up
+// to 100ms (an isolated indicator update took 101-118ms to reach the screen,
+// 1-17ms without the wait).
 func (d *gLDriver) pollEvents() {
-	if pendingFuncs.Load() > 0 {
+	if pendingFuncs.Load() > 0 || d.visibleCanvasDirty() {
 		glfw.PollEvents()
 		return
 	}

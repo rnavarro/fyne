@@ -311,6 +311,11 @@ func (c *Canvas) CheckDirtyAndClear() bool {
 	return wasDirty
 }
 
+// IsDirty reports whether the canvas needs a repaint, without clearing it.
+func (c *Canvas) IsDirty() bool {
+	return c.dirty
+}
+
 // SetDirty sets canvas dirty flag atomically.
 func (c *Canvas) SetDirty() {
 	c.dirty = true
