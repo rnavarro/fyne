@@ -36,8 +36,19 @@ func (d *gLDriver) initGLFW() {
 	}
 }
 
+// pollEvents blocks for up to 100ms waiting for events, so an idle app does
+// not busy-poll at 60fps. It does not block while fyne.Do work is queued:
+// runGL's select picks the event tick over a ready funcQueue about half the
+// time, and the PostEmptyEvent wake for that work may already have been
+// consumed, so waiting here delayed queued work by 100-700ms. A function
+// queued after the check increments pendingFuncs before posting its wake, so
+// the wake is never lost.
 func (d *gLDriver) pollEvents() {
-	glfw.WaitEventsTimeout(0.1) // Idle-friendly: block up to 100ms instead of busy-polling at 60fps
+	if pendingFuncs.Load() > 0 {
+		glfw.PollEvents()
+		return
+	}
+	glfw.WaitEventsTimeout(0.1)
 }
 
 // wakeEventLoop unblocks WaitEventsTimeout so the main loop promptly drains the

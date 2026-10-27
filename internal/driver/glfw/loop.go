@@ -23,6 +23,10 @@ type funcData struct {
 var (
 	funcQueue        = async.NewUnboundedChan[funcData]()
 	running, drained atomic.Bool
+
+	// pendingFuncs counts functions queued on funcQueue that the main loop has
+	// not started yet. pollEvents does not block while it is non-zero.
+	pendingFuncs atomic.Int64
 )
 
 // Arrange that main.main runs on main thread.
@@ -49,6 +53,7 @@ func runOnMainWithWait(f func(), wait bool) {
 		done := common.DonePool.Get()
 		defer common.DonePool.Put(done)
 
+		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f, done: done}
 		// Wake the main loop so it drains this immediately rather than waiting
 		// up to the WaitEventsTimeout interval (guarded: before Run the loop
@@ -58,6 +63,7 @@ func runOnMainWithWait(f func(), wait bool) {
 		}
 		<-done
 	} else {
+		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f}
 		if running.Load() {
 			wakeEventLoop()
@@ -160,6 +166,7 @@ func (d *gLDriver) runGL() {
 			funcQueue.Close()
 			return
 		case f := <-funcQueue.Out():
+			pendingFuncs.Add(-1)
 			f.f()
 			if f.done != nil {
 				f.done <- struct{}{}
