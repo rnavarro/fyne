@@ -3,6 +3,8 @@
 package glfw
 
 import (
+	"sync"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/internal/build"
 
@@ -15,6 +17,15 @@ const (
 	platformX11     = "x11"
 	platformWayland = "wayland"
 )
+
+// glfwState gates the calls that are only valid between glfw.Init and
+// glfw.Terminate. runGL sets running before initGLFW, so a fyne.Do queued from
+// another goroutine in that window (app.watchTheme does at startup) called
+// PostEmptyEvent too early and panicked with NotInitialized.
+var glfwState struct {
+	sync.RWMutex
+	ready bool
+}
 
 func (d *gLDriver) initGLFW() {
 	switch forcePlatform() {
@@ -29,6 +40,9 @@ func (d *gLDriver) initGLFW() {
 		fyne.LogError("failed to initialise GLFW", err)
 		return
 	}
+	glfwState.Lock()
+	glfwState.ready = true
+	glfwState.Unlock()
 
 	initCursors()
 	if glfw.GetPlatform() == glfw.PlatformWayland {
@@ -54,10 +68,20 @@ func (d *gLDriver) pollEvents() {
 // wakeEventLoop unblocks WaitEventsTimeout so the main loop promptly drains the
 // funcQueue (fyne.Do work) or observes d.done. Safe to call from any goroutine:
 // glfw.PostEmptyEvent is documented thread-safe.
+// Before glfw.Init and after Terminate it does nothing; work queued before
+// Init is drained by the first loop iteration, which polls instead of waiting
+// while pendingFuncs is non-zero.
 func wakeEventLoop() {
-	glfw.PostEmptyEvent()
+	glfwState.RLock()
+	defer glfwState.RUnlock()
+	if glfwState.ready {
+		glfw.PostEmptyEvent()
+	}
 }
 
 func (d *gLDriver) Terminate() {
+	glfwState.Lock()
+	defer glfwState.Unlock()
+	glfwState.ready = false
 	glfw.Terminate()
 }
